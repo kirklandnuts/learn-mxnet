@@ -1,3 +1,9 @@
+"""
+Binary logistic regression implemented with Gluon
+Created following MXNet's The Straight Dope (http://gluon.mxnet.io/chapter02_supervised-learning/logistic-regression-gluon.html)
+"""
+
+
 # Imports ----
 import mxnet as mx
 from mxnet import nd, autograd, gluon

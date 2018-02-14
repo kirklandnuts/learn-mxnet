@@ -1,3 +1,9 @@
+"""
+Multiclass logistic regression from scratch
+Created following MXNet's The Straight Dope (http://gluon.mxnet.io/chapter02_supervised-learning/softmax-regression-scratch.html)
+"""
+
+
 # Imports ----
 from __future__ import print_function
 import numpy as np

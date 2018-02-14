@@ -1,3 +1,9 @@
+"""
+Multiclass logistic regression implemented with Gluon
+Created following MXNet's The Straight Dope (http://gluon.mxnet.io/chapter02_supervised-learning/softmax-regression-gluon.html)
+"""
+
+
 # Imports ----
 from __future__ import print_function
 import mxnet as mx
