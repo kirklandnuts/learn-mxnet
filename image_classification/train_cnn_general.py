@@ -1,12 +1,11 @@
 '''
 This script trains a CNN for image recognition via transfer learning from MobileNet.
 
-USAGE: ipython train_cnn.py [path to data folder] [model_name] [batch_size] [epochs] [learning_rate]
-example: ipython train_cnn.py ~/projects/images/pools/n10 pools_n10 5 10 .001
+USAGE: ipython train_cnn.py [path to data folder] [model_name] [source_model] [batch_size] [epochs] [learning_rate]
+example: ipython train_cnn_general.py ~/projects/images/pools/n10 pools_n10 mobilenet 5 10 .001
 
 to-do:
-- try other source models (VGG, Inception, SqueezeNet)
-  as arguments
+
 '''
 
 
@@ -15,7 +14,6 @@ import os
 import sys
 import mxnet as mx
 from mxnet.image import color_normalize
-from mxnet.gluon.model_zoo.vision import mobilenet1_0
 from mxnet import image
 from mxnet import init
 from mxnet import gluon
@@ -67,13 +65,12 @@ def train(net, train, validation, ctx, batch_size=64, epochs=10, learning_rate=0
 
 
 def train_util(net, train_iter, validation_iter, loss_fn, trainer, ctx, epochs, batch_size):
-    metric = mx.metric.create(['acc'])
+    metric = mx.metric.Accuracy()
     for epoch in range(epochs):
         for i, (data, label) in enumerate(train_iter):
             st = time.time()
             # ensure context
             data = data.as_in_context(ctx)
-            print(data.shape)
             label = label.as_in_context(ctx)
             # normalize images
             data = color_normalize(data/255,
@@ -86,7 +83,8 @@ def train_util(net, train_iter, validation_iter, loss_fn, trainer, ctx, epochs, 
             trainer.step(data.shape[0])
             #  Keep a moving average of the losses
             metric.update([label], [output])
-            names, accs = metric.get()
+            names = [metric.get()[0]]
+            accs = [metric.get()[1]]
             print('[Epoch %d Batch %d] speed: %f samples/s, training: %s'%(epoch + 1, i + 1, batch_size/(time.time()-st), metric_str(names, accs)))
             # if i%100 == 0:
                 # net.collect_params().save('./checkpoints/%d-%d.params'%(epoch, i))
@@ -117,15 +115,40 @@ if __name__ == '__main__':
     # arguments
     data_dir = sys.argv[1]
     model_name = sys.argv[2]
-    batch_size = int(sys.argv[3])
-    epochs = int(sys.argv[4])
-    lr = float(sys.argv[5])
+    source_model = sys.argv[3]
+    batch_size = int(sys.argv[4])
+    epochs = int(sys.argv[5])
+    lr = float(sys.argv[6])
 
+    # instatiate source and target models
+    if source_model == 'mobilenet':
+        from mxnet.gluon.model_zoo.vision import mobilenet1_0
+        pretrained_net = mobilenet1_0(pretrained=True, prefix='model_')
+        net = mobilenet1_0(classes=2, prefix='model_')
+    elif source_model == 'vgg19':
+        from mxnet.gluon.model_zoo.vision import vgg19_bn
+        pretrained_net = vgg19_bn(pretrained=True, prefix='model_')
+        net = vgg19_bn(classes=2, prefix='model_')
+    elif source_model == 'resnet101':
+        from mxnet.gluon.model_zoo.vision import resnet101_v2
+        pretrained_net = resnet101_v2(pretrained=True, prefix='model_')
+        net = resnet101_v2(classes=2, prefix='model_')
+    elif source_model == 'inceptionv3':
+        from mxnet.gluon.model_zoo.vision import inception_v3
+        pretrained_net = inception_v3(pretrained=True, prefix='model_')
+        net = inception_v3(classes=2, prefix='model_')
+    elif source_model == 'squeezenet':
+        from mxnet.gluon.model_zoo.vision import squeezenet1_0
+        pretrained_net = squeezenet1_0(pretrained=True, prefix='model_')
+        net = squeezenet1_0(classes=2, prefix='model_')
+    else:
+        print("Available source models (ordered small -> large):\n['squeezenet', 'mobilenet', 'inceptionv3', 'resnet101', 'vgg19']")
 
     # pathing
-    train_rec = os.path.join(data_dir, 'train/img.rec')
-    validation_rec = os.path.join(data_dir, 'validation/img.rec')
-    model_out_path = os.path.join(data_dir, '../models/{}.params'.format(model_name))
+    train_rec = os.path.join(data_dir, 'img.rec')
+    # validation_rec = os.path.join(data_dir, 'validation/img.rec')
+    validation_rec = '/home/ubuntu/projects/computer_vision/pools/test/img.rec'
+    model_out_path = os.path.join(data_dir, '../models/{}_{}_b{}_e{}.params'.format(model_name, source_model, batch_size, epochs))
 
     # load data
     train_iterator = ImageRecordDataset(
@@ -138,9 +161,11 @@ if __name__ == '__main__':
     )
 
     # instantiate source model
-    pretrained_net = mobilenet1_0(pretrained=True, prefix='model_')
+    # pretrained_net = mobilenet1_0(pretrained=True, prefix='model_')
+    pretrained_net = vgg19_bn(pretrained=True, prefix='model_')
     # instantiate target model
-    net = mobilenet1_0(classes=2, prefix='model_')
+    # net = mobilenet1_0(classes=2, prefix='model_')
+    net = vgg19_bn(classes=2, prefix='model_')
     # transfer non output layers from source model to target model
     net.features = pretrained_net.features
     # initializing parameters for output layers of target model
